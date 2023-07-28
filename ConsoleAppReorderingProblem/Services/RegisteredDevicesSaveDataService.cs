@@ -19,6 +19,7 @@ namespace ConsoleAppReorderingProblem.Services
 
         public void ApplyChanges(List<DeviceReorderedDto> model)
         {
+            using var tr = _dataContext.Database.BeginTransaction();
             _dataContext.RegisteredDevices
                 .Where(device => model.Select(dto => dto.DeviceId).Contains(device.Id))
                 .ExecuteUpdate(up => up.SetProperty(device => device.PreviousDeviceId, (int?)null));
@@ -47,6 +48,7 @@ namespace ConsoleAppReorderingProblem.Services
             localDevices = localDevices.OrderBy(a => a.Position).ToList();
 
             _dataContext.SaveChanges();
+            tr.Commit();
         }
     }
 }

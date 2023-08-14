@@ -19,16 +19,22 @@ namespace ConsoleAppReorderingProblem.Services
 
         public void ApplyChanges(List<DeviceReorderedDto> model)
         {
-            var localDevices = _dataContext.RegisteredDevices.ToList();
+            using var tr = _dataContext.Database.BeginTransaction();
+            _dataContext.RegisteredDevices
+                .Where(device => model.Select(dto => dto.DeviceId).Contains(device.Id))
+                .ExecuteUpdate(up => up.SetProperty(device => device.PreviousDeviceId, (int?)null));
+            var changedDevices = _dataContext.RegisteredDevices
+                .Where(device => model.Select(dto => dto.DeviceId).Contains(device.Id))
+                .ToList();
             for (int i = 0; i < model.Count; i++)
             {
                 var item = model[i];
-                var device = localDevices.Where(a => a.Id == item.DeviceId).First();
-                var previousDevice = localDevices.Where(a => a.Id == item.NewPreviousDeviceId).FirstOrDefault();
-                device.PreviousDevice = previousDevice;
-                //device.PreviousDeviceId = previousDevice?.Id;
+                var device = changedDevices.Where(a => a.Id == item.DeviceId).First();
+                device.PreviousDeviceId = item.NewPreviousDeviceId;
             }
-
+            _dataContext.SaveChanges();
+            _dataContext.ChangeTracker.Clear();
+            var localDevices = _dataContext.RegisteredDevices.ToList();
             int? previousId = null;
             var liveRecordsCount = localDevices.Where(a => a.Position.HasValue).Count();
 
@@ -42,6 +48,7 @@ namespace ConsoleAppReorderingProblem.Services
             localDevices = localDevices.OrderBy(a => a.Position).ToList();
 
             _dataContext.SaveChanges();
+            tr.Commit();
         }
     }
 }
